@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Local YT Player</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      background: #000;
+      color: #fff;
+      height: 100vh;
+      display: flex;
+      overflow: hidden;
+    }
+
+    ::selection {
+      background: #1db954;
+      color: #000;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 260px;
+      background: #000;
+      border-right: 1px solid #222;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .sidebar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .sidebar-title {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .pill {
+      border-radius: 999px;
+      border: 1px solid #444;
+      padding: 2px 8px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #aaa;
+    }
+
+    .sidebar-section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1.4px;
+      color: #777;
+      margin-top: 6px;
+      margin-bottom: 4px;
+    }
+
+    .playlist-list {
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .playlist-item {
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin-bottom: 4px;
+      background: transparent;
+      transition: background 0.15s ease, transform 0.05s ease;
+    }
+
+    .playlist-item:hover {
+      background: #181818;
+      transform: translateY(-1px);
+    }
+
+    .playlist-item.active {
+      background: #1db954;
+      color: #000;
+    }
+
+    .playlist-item-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .playlist-name {
+      font-size: 14px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .playlist-id {
+      font-size: 11px;
+      color: #888;
+      word-break: break-all;
+    }
+
+    .playlist-actions {
+      display: flex;
+      gap: 4px;
+    }
+
+    .icon-btn {
+      border: none;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      font-size: 13px;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+
+    .icon-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .empty-state {
+      font-size: 11px;
+      color: #666;
+      margin-top: 4px;
+    }
+
+    /* Main */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: radial-gradient(circle at top, #2a2a2a 0, #000 60%);
+    }
+
+    .top-bar {
+      padding: 14px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      border-bottom: 1px solid #222;
+      background: linear-gradient(to bottom, #181818, transparent);
+    }
+
+    .top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .app-title {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .badge-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      font-size: 11px;
+    }
+
+    .badge {
+      border-radius: 999px;
+      border: 1px solid #444;
+      padding: 2px 8px;
+      color: #bbb;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .input-row input {
+      min-width: 160px;
+      padding: 8px 11px;
+      border-radius: 999px;
+      border: none;
+      outline: none;
+      background: #333;
+      color: #fff;
+      font-size: 13px;
+    }
+
+    .primary-btn {
+      border: none;
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-weight: 600;
+      cursor: pointer;
+      background: #1db954;
+      color: #000;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .primary-btn:hover {
+      filter: brightness(1.05);
+      transform: translateY(-1px);
+    }
+
+    .content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 12px 20px;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    .now-playing-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .now-playing-main {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .now-playing-title {
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .now-playing-meta {
+      font-size: 12px;
+      color: #aaa;
+    }
+
+    .player-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .secondary-btn {
+      border-radius: 999px;
+      border: 1px solid #444;
+      background: #111;
+      color: #ddd;
+      font-size: 12px;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+
+    .secondary-btn.small {
+      padding: 4px 8px;
+      font-size: 11px;
+    }
+
+    .secondary-btn:hover {
+      background: #222;
+    }
+
+    .progress-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: #aaa;
+      margin-top: 4px;
+    }
+
+    .progress-row span {
+      width: 40px;
+      text-align: center;
+    }
+
+    .progress-row input[type="range"] {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 4px;
+      border-radius: 999px;
+      background: #333;
+      outline: none;
+    }
+
+    .progress-row input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #1db954;
+      cursor: pointer;
+      margin-top: -3px;
+    }
+
+    .progress-row input[type="range"]::-moz-range-thumb {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #1db954;
+      cursor: pointer;
+    }
+
+    .player-shell {
+      flex: 1;
+      display: flex;
+      margin-top: 6px;
+      min-height: 0;
+    }
+
+    .player-wrapper {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #050505;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #222;
+      min-height: 220px;
+      max-height: 600px;
+      transition:
+        opacity 0.25s ease,
+        visibility 0.25s ease,
+        height 0.25s ease,
+        max-height 0.25s ease,
+        border-color 0.25s ease;
+    }
+
+    .player-wrapper iframe {
+      width: 100%;
+      height: 100%;
+      max-width: 960px;
+      max-height: 540px;
+      border: none;
+    }
+
+    .player-wrapper.collapsed {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      height: 0 !important;
+      min-height: 0 !important;
+      max-height: 0 !important;
+      border-color: transparent;
+    }
+
+    .placeholder {
+      text-align: center;
+      color: #777;
+      padding: 24px;
+      font-size: 13px;
+    }
+
+    .footer {
+      border-top: 1px solid #222;
+      padding: 6px 16px;
+      font-size: 11px;
+      color: #666;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #000;
+    }
+
+    @media (max-width: 900px) {
+      body {
+        flex-direction: column;
+      }
+
+      .sidebar {
+        width: 100%;
+        flex-direction: row;
+        align-items: flex-start;
+        border-right: none;
+        border-bottom: 1px solid #222;
+        height: auto;
+        max-height: 200px;
+      }
+
+      .playlist-list {
+        max-height: 140px;
+      }
+
+      .main {
+        height: calc(100vh - 200px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title">Playlists</div>
+      <div class="pill">Local</div>
+    </div>
+
+    <div class="sidebar-section-title">Saved</div>
+    <div id="playlistList" class="playlist-list"></div>
+    <div id="emptyState" class="empty-state">
+      No playlists yet.
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <!-- TOP BAR -->
+    <header class="top-bar">
+      <div class="top-row">
+        <div class="app-title">Local YT Player</div>
+        <div class="badge-row">
+          <div class="badge">No backend</div>
+          <div class="badge">localStorage</div>
+          <div class="badge">YouTube playlist</div>
+        </div>
+      </div>
+
+      <div class="input-row">
+        <input
+          id="playlistNameInput"
+          type="text"
+          placeholder="Name (Lofi, Gym, etc.)"
+        />
+        <input
+          id="playlistUrlInput"
+          type="text"
+          placeholder="YouTube playlist URL or ID"
+        />
+        <button id="savePlaylistBtn" class="primary-btn">Save & play</button>
+      </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <section class="content">
+      <div class="now-playing-bar">
+        <div class="now-playing-main">
+          <div id="nowPlayingTitle" class="now-playing-title">Nothing playing</div>
+          <div id="nowPlayingMeta" class="now-playing-meta">Select or save a playlist.</div>
+        </div>
+
+        <div class="player-controls">
+          <button id="prevBtn" class="secondary-btn small">⏮</button>
+          <button id="playPauseBtn" class="secondary-btn small">▶</button>
+          <button id="nextBtn" class="secondary-btn small">⏭</button>
+          <button id="toggleVideoBtn" class="secondary-btn">Hide video</button>
+        </div>
+      </div>
+
+      <div class="progress-row">
+        <span id="currentTimeLabel">0:00</span>
+        <input id="progressBar" type="range" min="0" max="100" value="0" />
+        <span id="durationLabel">0:00</span>
+      </div>
+
+      <div class="player-shell">
+        <div id="playerWrapper" class="player-wrapper">
+          <div class="placeholder">
+            No playlist loaded.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div>Local YT player UI.</div>
+      <div>Uses official YouTube embeds only.</div>
+    </footer>
+  </main>
+
+  <!-- YouTube IFrame API -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+
+  <script>
+    const STORAGE_KEY = "ytPlaylistList_v1";
+
+    let playlists = [];
+    let currentPlaylistId = null;
+    let videoCollapsed = false;
+
+    let ytApiReady = false;
+    let ytPlayer = null;
+    let progressTimer = null;
+
+    const playlistListEl = document.getElementById("playlistList");
+    const emptyStateEl = document.getElementById("emptyState");
+    const playlistNameInput = document.getElementById("playlistNameInput");
+    const playlistUrlInput = document.getElementById("playlistUrlInput");
+    const savePlaylistBtn = document.getElementById("savePlaylistBtn");
+    const playerWrapper = document.getElementById("playerWrapper");
+    const nowPlayingTitle = document.getElementById("nowPlayingTitle");
+    const nowPlayingMeta = document.getElementById("nowPlayingMeta");
+    const toggleVideoBtn = document.getElementById("toggleVideoBtn");
+
+    const prevBtn = document.getElementById("prevBtn");
+    const playPauseBtn = document.getElementById("playPauseBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    const progressBar = document.getElementById("progressBar");
+    const currentTimeLabel = document.getElementById("currentTimeLabel");
+    const durationLabel = document.getElementById("durationLabel");
+
+    function loadFromStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          playlists = parsed;
+        }
+      } catch (e) {
+        console.error("Failed to load playlists:", e);
+      }
+    }
+
+    function saveToStorage() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(playlists));
+      } catch (e) {
+        console.error("Failed to save playlists:", e);
+      }
+    }
+
+    function extractPlaylistId(raw) {
+      if (!raw) return null;
+      raw = raw.trim();
+
+      const match = raw.match(/[?&]list=([^&]+)/);
+      if (match) return match[1];
+
+      if (/^[A-Za-z0-9_-]{10,}$/.test(raw)) {
+        return raw;
+      }
+
+      return null;
+    }
+
+    function renderPlaylists() {
+      playlistListEl.innerHTML = "";
+
+      if (!playlists.length) {
+        emptyStateEl.style.display = "block";
+        return;
+      }
+
+      emptyStateEl.style.display = "none";
+
+      playlists.forEach((pl) => {
+        const item = document.createElement("div");
+        item.className = "playlist-item" + (pl.id === currentPlaylistId ? " active" : "");
+        item.dataset.playlistId = pl.id;
+
+        const topRow = document.createElement("div");
+        topRow.className = "playlist-item-top";
+
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "playlist-name";
+        nameSpan.textContent = pl.name || "(Untitled)";
+
+        const actions = document.createElement("div");
+        actions.className = "playlist-actions";
+
+        const playBtn = document.createElement("button");
+        playBtn.className = "icon-btn";
+        playBtn.textContent = "▶";
+        playBtn.title = "Play";
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "icon-btn";
+        deleteBtn.textContent = "✕";
+        deleteBtn.title = "Delete";
+
+        actions.appendChild(playBtn);
+        actions.appendChild(deleteBtn);
+
+        topRow.appendChild(nameSpan);
+        topRow.appendChild(actions);
+
+        const idSpan = document.createElement("span");
+        idSpan.className = "playlist-id";
+        idSpan.textContent = pl.id;
+
+        item.appendChild(topRow);
+        item.appendChild(idSpan);
+
+        item.addEventListener("click", (event) => {
+          if (event.target === deleteBtn || event.target === playBtn) return;
+          setCurrentPlaylist(pl.id);
+        });
+
+        playBtn.addEventListener("click", (event) => {
+          event.stopPropagation();
+          setCurrentPlaylist(pl.id);
+        });
+
+        deleteBtn.addEventListener("click", (event) => {
+          event.stopPropagation();
+          deletePlaylist(pl.id);
+        });
+
+        playlistListEl.appendChild(item);
+      });
+    }
+
+    function renderPlayer() {
+      const playlist = playlists.find((p) => p.id === currentPlaylistId);
+
+      if (!playlist) {
+        if (ytPlayer) {
+          try {
+            ytPlayer.stopVideo();
+          } catch (e) {}
+        }
+        playerWrapper.innerHTML = "";
+        const placeholder = document.createElement("div");
+        placeholder.className = "placeholder";
+        placeholder.textContent = "No playlist loaded.";
+        playerWrapper.appendChild(placeholder);
+
+        nowPlayingTitle.textContent = "Nothing playing";
+        nowPlayingMeta.textContent = "Select or save a playlist.";
+        progressBar.value = 0;
+        currentTimeLabel.textContent = "0:00";
+        durationLabel.textContent = "0:00";
+        return;
+      }
+
+      nowPlayingTitle.textContent = playlist.name || "Untitled playlist";
+      nowPlayingMeta.textContent = playlist.id;
+
+      ensurePlayerCreated(playlist.id);
+    }
+
+    function ensurePlayerCreated(playlistId) {
+      let frame = document.getElementById("playerFrame");
+      if (!frame) {
+        playerWrapper.innerHTML = "";
+        frame = document.createElement("div");
+        frame.id = "playerFrame";
+        playerWrapper.appendChild(frame);
+      }
+
+      if (!ytApiReady) {
+        return;
+      }
+
+      if (!ytPlayer) {
+        ytPlayer = new YT.Player("playerFrame", {
+          height: "100%",
+          width: "100%",
+          playerVars: {
+            listType: "playlist",
+            list: playlistId,
+            autoplay: 1,
+          },
+          events: {
+            onReady: onPlayerReady,
+            onStateChange: onPlayerStateChange,
+          },
+        });
+      } else {
+        ytPlayer.loadPlaylist({
+          listType: "playlist",
+          list: playlistId,
+        });
+        ytPlayer.playVideo();
+      }
+    }
+
+    function onPlayerReady() {
+      // nothing extra
+    }
+
+    function updateNowPlayingFromPlayer() {
+      if (!ytPlayer || typeof ytPlayer.getVideoData !== "function") return;
+      const data = ytPlayer.getVideoData() || {};
+      const title = data.title || "Playing";
+      const author = data.author || "";
+      nowPlayingTitle.textContent = title;
+      if (author && currentPlaylistId) {
+        nowPlayingMeta.textContent = `${author} • ${currentPlaylistId}`;
+      } else if (author) {
+        nowPlayingMeta.textContent = author;
+      } else if (currentPlaylistId) {
+        nowPlayingMeta.textContent = currentPlaylistId;
+      } else {
+        nowPlayingMeta.textContent = "";
+      }
+    }
+
+    function onPlayerStateChange(event) {
+      const state = event.data;
+      if (!ytPlayer) return;
+
+      if (state === YT.PlayerState.PLAYING) {
+        playPauseBtn.textContent = "⏸";
+        updateNowPlayingFromPlayer(); // <- song name + author
+        startProgressTimer();
+      } else if (
+        state === YT.PlayerState.PAUSED ||
+        state === YT.PlayerState.ENDED
+      ) {
+        playPauseBtn.textContent = "▶";
+        stopProgressTimer();
+
+        if (state === YT.PlayerState.ENDED) {
+          const duration = ytPlayer.getDuration() || 0;
+          updateProgressUI(duration, duration);
+        }
+      }
+    }
+
+    function startProgressTimer() {
+      if (progressTimer) return;
+      progressTimer = setInterval(() => {
+        if (!ytPlayer || typeof ytPlayer.getCurrentTime !== "function") return;
+        const current = ytPlayer.getCurrentTime() || 0;
+        const duration = ytPlayer.getDuration() || 0;
+        updateProgressUI(current, duration);
+      }, 500);
+    }
+
+    function stopProgressTimer() {
+      if (progressTimer) {
+        clearInterval(progressTimer);
+        progressTimer = null;
+      }
+    }
+
+    function updateProgressUI(current, duration) {
+      currentTimeLabel.textContent = formatTime(current);
+      durationLabel.textContent = duration ? formatTime(duration) : "0:00";
+      if (duration > 0) {
+        progressBar.value = (current / duration) * 100;
+      } else {
+        progressBar.value = 0;
+      }
+    }
+
+    function formatTime(seconds) {
+      seconds = Math.floor(seconds || 0);
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = seconds % 60;
+      const mm = h > 0 ? String(m).padStart(2, "0") : String(m);
+      const ss = String(s).padStart(2, "0");
+      return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+    }
+
+    function updateVideoToggleUI() {
+      if (videoCollapsed) {
+        playerWrapper.classList.add("collapsed");
+        toggleVideoBtn.textContent = "Show video";
+      } else {
+        playerWrapper.classList.remove("collapsed");
+        toggleVideoBtn.textContent = "Hide video";
+      }
+    }
+
+    function setCurrentPlaylist(playlistId) {
+      currentPlaylistId = playlistId;
+      renderPlaylists();
+      renderPlayer();
+    }
+
+    function addPlaylist(name, urlOrId) {
+      const id = extractPlaylistId(urlOrId);
+      if (!id) {
+        alert("Invalid playlist URL/ID.");
+        return;
+      }
+
+      const existing = playlists.find((p) => p.id === id);
+      if (existing) {
+        existing.name = name || existing.name;
+        setCurrentPlaylist(existing.id);
+        saveToStorage();
+        renderPlaylists();
+        return;
+      }
+
+      const playlist = {
+        id,
+        name: name || "Untitled",
+        createdAt: Date.now(),
+      };
+
+      playlists.push(playlist);
+      saveToStorage();
+      setCurrentPlaylist(id);
+      renderPlaylists();
+    }
+
+    function deletePlaylist(playlistId) {
+      const confirmed = confirm("Delete this playlist?");
+      if (!confirmed) return;
+
+      playlists = playlists.filter((p) => p.id !== playlistId);
+
+      if (currentPlaylistId === playlistId) {
+        currentPlaylistId = playlists[0]?.id || null;
+      }
+
+      saveToStorage();
+      renderPlaylists();
+      renderPlayer();
+    }
+
+    savePlaylistBtn.addEventListener("click", () => {
+      const name = playlistNameInput.value.trim();
+      const url = playlistUrlInput.value.trim();
+
+      if (!url) {
+        alert("Paste a playlist URL/ID first.");
+        return;
+      }
+
+      addPlaylist(name, url);
+    });
+
+    [playlistNameInput, playlistUrlInput].forEach((input) => {
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          savePlaylistBtn.click();
+        }
+      });
+    });
+
+    toggleVideoBtn.addEventListener("click", () => {
+      videoCollapsed = !videoCollapsed;
+      updateVideoToggleUI();
+    });
+
+    prevBtn.addEventListener("click", () => {
+      if (!ytPlayer) return;
+      try {
+        ytPlayer.previousVideo();
+      } catch (e) {}
+    });
+
+    nextBtn.addEventListener("click", () => {
+      if (!ytPlayer) return;
+      try {
+        ytPlayer.nextVideo();
+      } catch (e) {}
+    });
+
+    playPauseBtn.addEventListener("click", () => {
+      if (!ytPlayer || typeof ytPlayer.getPlayerState !== "function") return;
+      const state = ytPlayer.getPlayerState();
+      if (state === YT.PlayerState.PLAYING) {
+        ytPlayer.pauseVideo();
+      } else {
+        ytPlayer.playVideo();
+      }
+    });
+
+    progressBar.addEventListener("input", () => {
+      if (!ytPlayer || typeof ytPlayer.getDuration !== "function") return;
+      const duration = ytPlayer.getDuration() || 0;
+      if (!duration) return;
+      const percent = parseFloat(progressBar.value) || 0;
+      const target = (percent / 100) * duration;
+      ytPlayer.seekTo(target, true);
+    });
+
+    window.addEventListener("DOMContentLoaded", () => {
+      loadFromStorage();
+      if (playlists.length) {
+        currentPlaylistId = playlists[0].id;
+      }
+      renderPlaylists();
+      renderPlayer();
+      updateVideoToggleUI();
+    });
+
+    // YouTube API callback
+    function onYouTubeIframeAPIReady() {
+      ytApiReady = true;
+      if (currentPlaylistId) {
+        ensurePlayerCreated(currentPlaylistId);
+      }
+    }
+  </script>
+</body>
+</html>
