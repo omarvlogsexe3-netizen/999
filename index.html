@@ -566,12 +566,129 @@
     }
 
     @media (max-width: 600px) {
-      .app { width: min(100% - 18px, 1200px); padding-top: 14px; }
-      .stats { grid-template-columns: 1fr; }
-      .csv-buttons { grid-template-columns: 1fr; }
-      .set-row { grid-template-columns: 32px 42px 1fr; }
-      .set-row label { grid-column: span 1; }
-      .set-row .mini-btn { grid-column: 3; justify-self: end; }
+      .app {
+        width: min(100% - 18px, 1200px);
+        padding-top: 14px;
+      }
+
+      header {
+        gap: 14px;
+      }
+
+      .actions {
+        width: 100%;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        justify-content: flex-start;
+        padding-bottom: 4px;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .actions .btn {
+        flex: 0 0 auto;
+      }
+
+      .stats {
+        grid-template-columns: 1fr;
+      }
+
+      .csv-buttons {
+        grid-template-columns: 1fr;
+      }
+
+      .day-card {
+        border-radius: 16px;
+      }
+
+      .day-head {
+        padding: 12px;
+      }
+
+      .day-name {
+        font-size: 19px;
+      }
+
+      .day-title-row {
+        gap: 8px;
+      }
+
+      .pill {
+        padding: 5px 8px;
+        font-size: 11px;
+      }
+
+      .exercise-card {
+        margin-bottom: 8px;
+        border-radius: 13px;
+      }
+
+      .exercise-top {
+        grid-template-columns: 1fr auto;
+        padding: 10px;
+      }
+
+      .exercise-actions {
+        justify-content: flex-end;
+      }
+
+      .exercise-body {
+        padding: 0 8px 8px;
+      }
+
+      .ex-title small {
+        display: none;
+      }
+
+      .exercise-title-row {
+        gap: 8px;
+      }
+
+      .exercise-chevron,
+      .chev {
+        width: 28px;
+        height: 28px;
+        border-radius: 9px;
+      }
+
+      .set-row {
+        grid-template-columns: 34px 38px 1fr 42px;
+        grid-template-areas:
+          "num check reps del"
+          "num check weight del";
+        gap: 8px;
+        padding: 8px;
+      }
+
+      .set-num {
+        grid-area: num;
+      }
+
+      .check {
+        grid-area: check;
+      }
+
+      .set-row label:nth-of-type(1) {
+        grid-area: reps;
+      }
+
+      .set-row label:nth-of-type(2) {
+        grid-area: weight;
+      }
+
+      .set-row .mini-btn {
+        grid-area: del;
+        justify-self: end;
+      }
+
+      .mini-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 11px;
+      }
+
+      input {
+        padding: 9px;
+      }
     }
   </style>
 </head>
