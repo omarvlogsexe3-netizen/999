@@ -2,906 +2,1578 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Local YT Player</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SplitLog IndexedDB</title>
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    :root {
+      --bg: #0b0d12;
+      --text: #f5f7fb;
+      --muted: #9ca3af;
+      --line: rgba(255,255,255,.11);
+      --accent: #a3ff12;
+      --accent2: #58d6ff;
+      --danger: #ff4d6d;
+      --radius: 18px;
+      --shadow: 0 24px 70px rgba(0,0,0,.35);
+      --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
     }
+
+    * { box-sizing: border-box; }
 
     body {
-      background: #000;
-      color: #fff;
-      height: 100vh;
-      display: flex;
-      overflow: hidden;
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--font);
+      color: var(--text);
+      background:
+        radial-gradient(circle at 10% 0%, rgba(163,255,18,.15), transparent 30rem),
+        radial-gradient(circle at 90% 10%, rgba(88,214,255,.12), transparent 28rem),
+        var(--bg);
     }
 
-    ::selection {
-      background: #1db954;
-      color: #000;
+    button, input, textarea { font: inherit; }
+    button { cursor: pointer; border: 0; }
+
+    .app {
+      width: min(1200px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 24px 0 54px;
     }
 
-    /* Sidebar */
-    .sidebar {
-      width: 260px;
-      background: #000;
-      border-right: 1px solid #222;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .sidebar-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 4px;
-    }
-
-    .sidebar-title {
-      font-size: 18px;
-      font-weight: 700;
-    }
-
-    .pill {
-      border-radius: 999px;
-      border: 1px solid #444;
-      padding: 2px 8px;
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: #aaa;
-    }
-
-    .sidebar-section-title {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 1.4px;
-      color: #777;
-      margin-top: 6px;
-      margin-bottom: 4px;
-    }
-
-    .playlist-list {
-      flex: 1;
-      overflow-y: auto;
-      padding-right: 4px;
-    }
-
-    .playlist-item {
-      padding: 8px 10px;
-      border-radius: 6px;
-      cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      margin-bottom: 4px;
-      background: transparent;
-      transition: background 0.15s ease, transform 0.05s ease;
-    }
-
-    .playlist-item:hover {
-      background: #181818;
-      transform: translateY(-1px);
-    }
-
-    .playlist-item.active {
-      background: #1db954;
-      color: #000;
-    }
-
-    .playlist-item-top {
+    header {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      gap: 6px;
+      gap: 18px;
+      align-items: flex-start;
+      margin-bottom: 18px;
     }
 
-    .playlist-name {
+    .brand {
+      display: flex;
+      gap: 13px;
+      align-items: center;
+    }
+
+    .mark {
+      width: 48px;
+      height: 48px;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      color: #061000;
+      background: linear-gradient(135deg, var(--accent), #efff7d);
+      font-weight: 1000;
+      letter-spacing: -1px;
+      box-shadow: 0 0 40px rgba(163,255,18,.18);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(30px, 5vw, 52px);
+      line-height: .92;
+      letter-spacing: -2px;
+    }
+
+    h2 { letter-spacing: -.5px; }
+
+    .sub {
+      margin: 8px 0 0;
+      color: var(--muted);
       font-size: 14px;
-      font-weight: 500;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      line-height: 1.45;
     }
 
-    .playlist-id {
-      font-size: 11px;
-      color: #888;
-      word-break: break-all;
-    }
-
-    .playlist-actions {
+    .actions {
       display: flex;
-      gap: 4px;
-    }
-
-    .icon-btn {
-      border: none;
-      background: transparent;
-      color: inherit;
-      cursor: pointer;
-      font-size: 13px;
-      padding: 2px 4px;
-      border-radius: 4px;
-    }
-
-    .icon-btn:hover {
-      background: rgba(255, 255, 255, 0.08);
-    }
-
-    .empty-state {
-      font-size: 11px;
-      color: #666;
-      margin-top: 4px;
-    }
-
-    /* Main */
-    .main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      background: radial-gradient(circle at top, #2a2a2a 0, #000 60%);
-    }
-
-    .top-bar {
-      padding: 14px 20px;
-      display: flex;
-      flex-direction: column;
       gap: 10px;
-      border-bottom: 1px solid #222;
-      background: linear-gradient(to bottom, #181818, transparent);
-    }
-
-    .top-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-
-    .app-title {
-      font-size: 18px;
-      font-weight: 600;
-    }
-
-    .badge-row {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-      font-size: 11px;
-    }
-
-    .badge {
-      border-radius: 999px;
-      border: 1px solid #444;
-      padding: 2px 8px;
-      color: #bbb;
-    }
-
-    .input-row {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .input-row input {
-      min-width: 160px;
-      padding: 8px 11px;
-      border-radius: 999px;
-      border: none;
-      outline: none;
-      background: #333;
-      color: #fff;
-      font-size: 13px;
-    }
-
-    .primary-btn {
-      border: none;
-      border-radius: 999px;
-      padding: 8px 16px;
-      font-weight: 600;
-      cursor: pointer;
-      background: #1db954;
-      color: #000;
-      font-size: 13px;
-      white-space: nowrap;
-    }
-
-    .primary-btn:hover {
-      filter: brightness(1.05);
-      transform: translateY(-1px);
-    }
-
-    .content {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      padding: 12px 20px;
-      gap: 8px;
-      overflow: hidden;
-    }
-
-    .now-playing-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .now-playing-main {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .now-playing-title {
-      font-size: 15px;
-      font-weight: 600;
-    }
-
-    .now-playing-meta {
-      font-size: 12px;
-      color: #aaa;
-    }
-
-    .player-controls {
-      display: flex;
-      align-items: center;
-      gap: 6px;
       flex-wrap: wrap;
       justify-content: flex-end;
     }
 
-    .secondary-btn {
+    .btn {
+      border: 1px solid var(--line);
+      color: var(--text);
+      background: rgba(255,255,255,.065);
+      padding: 11px 14px;
       border-radius: 999px;
-      border: 1px solid #444;
-      background: #111;
-      color: #ddd;
-      font-size: 12px;
-      padding: 6px 10px;
-      cursor: pointer;
+      font-weight: 850;
+      transition: .18s ease;
+      white-space: nowrap;
     }
 
-    .secondary-btn.small {
-      padding: 4px 8px;
-      font-size: 11px;
+    .btn:hover {
+      transform: translateY(-1px);
+      background: rgba(255,255,255,.1);
     }
 
-    .secondary-btn:hover {
-      background: #222;
-    }
-
-    .progress-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 11px;
-      color: #aaa;
-      margin-top: 4px;
-    }
-
-    .progress-row span {
-      width: 40px;
-      text-align: center;
-    }
-
-    .progress-row input[type="range"] {
-      flex: 1;
-      -webkit-appearance: none;
-      appearance: none;
-      height: 4px;
-      border-radius: 999px;
-      background: #333;
-      outline: none;
-    }
-
-    .progress-row input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #1db954;
-      cursor: pointer;
-      margin-top: -3px;
-    }
-
-    .progress-row input[type="range"]::-moz-range-thumb {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #1db954;
-      cursor: pointer;
-    }
-
-    .player-shell {
-      flex: 1;
-      display: flex;
-      margin-top: 6px;
-      min-height: 0;
-    }
-
-    .player-wrapper {
-      flex: 1;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: #050505;
-      border-radius: 8px;
-      overflow: hidden;
-      border: 1px solid #222;
-      min-height: 220px;
-      max-height: 600px;
-      transition:
-        opacity 0.25s ease,
-        visibility 0.25s ease,
-        height 0.25s ease,
-        max-height 0.25s ease,
-        border-color 0.25s ease;
-    }
-
-    .player-wrapper iframe {
-      width: 100%;
-      height: 100%;
-      max-width: 960px;
-      max-height: 540px;
-      border: none;
-    }
-
-    .player-wrapper.collapsed {
-      opacity: 0;
-      visibility: hidden;
-      pointer-events: none;
-      height: 0 !important;
-      min-height: 0 !important;
-      max-height: 0 !important;
+    .btn.primary {
+      color: #071000;
+      background: var(--accent);
       border-color: transparent;
     }
 
-    .placeholder {
+    .btn.blue {
+      color: #031017;
+      background: var(--accent2);
+      border-color: transparent;
+    }
+
+    .btn.danger {
+      color: #fff;
+      background: rgba(255,77,109,.16);
+      border-color: rgba(255,77,109,.32);
+    }
+
+    .panel {
+      background: rgba(17,20,28,.84);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+      backdrop-filter: blur(16px);
+      margin-bottom: 14px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .stat {
+      background: rgba(255,255,255,.055);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 15px;
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 28px;
+      letter-spacing: -1px;
+    }
+
+    .stat span {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      font-weight: 900;
+    }
+
+    label { display: block; }
+
+    .label {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 900;
+      margin-bottom: 6px;
+      letter-spacing: .8px;
+    }
+
+    input, textarea {
+      width: 100%;
+      background: rgba(0,0,0,.24);
+      border: 1px solid var(--line);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 10px;
+      outline: none;
+    }
+
+    input:focus, textarea:focus {
+      border-color: rgba(163,255,18,.52);
+      box-shadow: 0 0 0 4px rgba(163,255,18,.07);
+    }
+
+    .collapsible {
+      margin-bottom: 14px;
+    }
+
+    .collapse-row {
+      display: flex;
+      justify-content: flex-start;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .collapse-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      width: auto;
+      min-width: 0;
+      border-radius: 999px;
+      padding: 11px 15px;
+    }
+
+    .arrow {
+      display: inline-block;
+      transition: .18s ease;
+      font-weight: 1000;
+    }
+
+    .collapsible.open .arrow {
+      transform: rotate(90deg);
+    }
+
+    .collapse-box {
+      display: none;
+      margin-top: 12px;
+      background: rgba(17,20,28,.84);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+      padding: 16px;
+    }
+
+    .collapsible.open .collapse-box {
+      display: block;
+    }
+
+    .session-grid {
+      display: grid;
+      grid-template-columns: 170px 1fr auto;
+      gap: 10px;
+      align-items: end;
+    }
+
+    textarea {
+      min-height: 160px;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .csv-grid {
+      display: grid;
+      grid-template-columns: 1fr 165px;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .csv-buttons {
+      display: grid;
+      gap: 8px;
+    }
+
+    .hint {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .split {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .day-card {
+      background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.045));
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 14px 50px rgba(0,0,0,.22);
+    }
+
+    .day-head {
+      width: 100%;
+      cursor: pointer;
+      user-select: none;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      text-align: left;
+      background: transparent;
+      color: var(--text);
+      padding: 17px;
+    }
+
+    .day-title-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .chev {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      background: rgba(255,255,255,.08);
+      border: 1px solid var(--line);
+      transition: .18s ease;
+    }
+
+    .day-card.open .chev {
+      transform: rotate(90deg);
+      background: rgba(163,255,18,.15);
+      border-color: rgba(163,255,18,.35);
+    }
+
+    .day-name {
+      font-size: 22px;
+      font-weight: 950;
+      letter-spacing: -.5px;
+    }
+
+    .pill {
+      border-radius: 999px;
+      background: rgba(255,255,255,.075);
+      border: 1px solid var(--line);
+      padding: 6px 9px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .pill.done {
+      color: #071000;
+      background: var(--accent);
+      border-color: transparent;
+    }
+
+    .day-progress {
+      width: min(260px, 100%);
+      height: 9px;
+      background: rgba(255,255,255,.08);
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.08);
+    }
+
+    .bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: inherit;
+    }
+
+    .day-body {
+      display: none;
+      padding: 0 14px 14px;
+    }
+
+    .day-card.open .day-body { display: block; }
+
+    .exercise-card {
+      background: rgba(0,0,0,.18);
+      border: 1px solid var(--line);
+      border-radius: 17px;
+      margin-bottom: 10px;
+      overflow: hidden;
+    }
+
+    .exercise-card.open .exercise-chevron {
+      transform: rotate(90deg);
+      background: rgba(163,255,18,.15);
+      border-color: rgba(163,255,18,.35);
+    }
+
+    .exercise-top {
+      width: 100%;
+      cursor: pointer;
+      user-select: none;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      background: transparent;
+      color: var(--text);
+      text-align: left;
+      padding: 12px;
+    }
+
+    .ex-title {
+      font-weight: 950;
+      font-size: 17px;
+    }
+
+    .ex-title small {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+      margin-top: 3px;
+    }
+
+    .exercise-title-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .exercise-chevron {
+      width: 30px;
+      height: 30px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      background: rgba(255,255,255,.08);
+      border: 1px solid var(--line);
+      transition: .18s ease;
+      flex: 0 0 auto;
+    }
+
+    .exercise-body {
+      display: none;
+      padding: 0 12px 12px;
+    }
+
+    .exercise-card.open .exercise-body {
+      display: block;
+    }
+
+    .set-grid {
+      display: grid;
+      gap: 8px;
+    }
+
+    .set-row {
+      display: grid;
+      grid-template-columns: 35px 60px 1fr 1fr 46px;
+      gap: 8px;
+      align-items: center;
+      background: rgba(255,255,255,.045);
+      border: 1px solid rgba(255,255,255,.075);
+      border-radius: 14px;
+      padding: 9px;
+    }
+
+    .set-num {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
       text-align: center;
-      color: #777;
-      padding: 24px;
+    }
+
+    .check {
+      width: 25px;
+      height: 25px;
+      accent-color: var(--accent);
+    }
+
+    .mini-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      color: var(--text);
+      background: rgba(255,255,255,.075);
+      border: 1px solid var(--line);
+      font-weight: 950;
+    }
+
+    .mini-btn.danger {
+      color: #ffbdc8;
+      background: rgba(255,77,109,.12);
+      border-color: rgba(255,77,109,.28);
+    }
+
+    .exercise-actions {
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .empty {
+      padding: 18px;
+      color: var(--muted);
+      border: 1px dashed rgba(255,255,255,.16);
+      border-radius: 16px;
+      text-align: center;
+    }
+
+    .history-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .history-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+      background: rgba(255,255,255,.05);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 10px;
+      color: var(--muted);
       font-size: 13px;
     }
 
-    .footer {
-      border-top: 1px solid #222;
-      padding: 6px 16px;
-      font-size: 11px;
-      color: #666;
+    .history-actions {
       display: flex;
-      justify-content: space-between;
+      gap: 8px;
+      justify-content: flex-end;
       align-items: center;
-      background: #000;
+      flex-wrap: wrap;
+    }
+
+    .undo-toast {
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      display: none;
+      align-items: center;
+      gap: 10px;
+      background: rgba(17,20,28,.96);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      border-radius: 999px;
+      padding: 10px 12px 10px 16px;
+      z-index: 50;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .undo-toast.show { display: flex; }
+    .hidden { display: none; }
+
+    .footer {
+      text-align: center;
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 12px;
+      opacity: .75;
     }
 
     @media (max-width: 900px) {
-      body {
-        flex-direction: column;
-      }
+      header { flex-direction: column; }
+      .actions { justify-content: flex-start; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .session-grid, .csv-grid { grid-template-columns: 1fr; }
+      .csv-buttons { grid-template-columns: repeat(2, 1fr); }
+      .day-head { grid-template-columns: 1fr; }
+      .day-progress { width: 100%; }
+      .exercise-top { grid-template-columns: 1fr; }
+      .exercise-actions { justify-content: flex-start; }
+    }
 
-      .sidebar {
-        width: 100%;
-        flex-direction: row;
-        align-items: flex-start;
-        border-right: none;
-        border-bottom: 1px solid #222;
-        height: auto;
-        max-height: 200px;
-      }
-
-      .playlist-list {
-        max-height: 140px;
-      }
-
-      .main {
-        height: calc(100vh - 200px);
-      }
+    @media (max-width: 600px) {
+      .app { width: min(100% - 18px, 1200px); padding-top: 14px; }
+      .stats { grid-template-columns: 1fr; }
+      .csv-buttons { grid-template-columns: 1fr; }
+      .set-row { grid-template-columns: 32px 42px 1fr; }
+      .set-row label { grid-column: span 1; }
+      .set-row .mini-btn { grid-column: 3; justify-self: end; }
     }
   </style>
 </head>
 <body>
-  <!-- SIDEBAR -->
-  <aside class="sidebar">
-    <div class="sidebar-header">
-      <div class="sidebar-title">Playlists</div>
-      <div class="pill">Local</div>
-    </div>
-
-    <div class="sidebar-section-title">Saved</div>
-    <div id="playlistList" class="playlist-list"></div>
-    <div id="emptyState" class="empty-state">
-      No playlists yet.
-    </div>
-  </aside>
-
-  <!-- MAIN -->
-  <main class="main">
-    <!-- TOP BAR -->
-    <header class="top-bar">
-      <div class="top-row">
-        <div class="app-title">Local YT Player</div>
-        <div class="badge-row">
-          <div class="badge">No backend</div>
-          <div class="badge">localStorage</div>
-          <div class="badge">YouTube playlist</div>
+  <div class="app">
+    <header>
+      <div class="brand">
+        <div class="mark">SL</div>
+        <div>
+          <h1>SplitLog</h1>
+          <p class="sub">IndexedDB storage. Reset clears today only. Clear All deletes everything.</p>
         </div>
       </div>
-
-      <div class="input-row">
-        <input
-          id="playlistNameInput"
-          type="text"
-          placeholder="Name (Lofi, Gym, etc.)"
-        />
-        <input
-          id="playlistUrlInput"
-          type="text"
-          placeholder="YouTube playlist URL or ID"
-        />
-        <button id="savePlaylistBtn" class="primary-btn">Save & play</button>
+      <div class="actions">
+        <button class="btn primary" id="exportTodayBtn">Export Today CSV</button>
+        <button class="btn blue" id="exportHistoryBtn">Export History</button>
+        <button class="btn" id="prefillBtn">Prefill Last</button>
+        <button class="btn" id="prefillCsvBtn">Prefill From CSV</button>
+        <button class="btn" id="resetBtn">Reset Current Log</button>
+        <button class="btn danger" id="clearAllBtn">Clear All</button>
       </div>
     </header>
 
-    <!-- MAIN CONTENT -->
-    <section class="content">
-      <div class="now-playing-bar">
-        <div class="now-playing-main">
-          <div id="nowPlayingTitle" class="now-playing-title">Nothing playing</div>
-          <div id="nowPlayingMeta" class="now-playing-meta">Select or save a playlist.</div>
-        </div>
-
-        <div class="player-controls">
-          <button id="prevBtn" class="secondary-btn small">⏮</button>
-          <button id="playPauseBtn" class="secondary-btn small">▶</button>
-          <button id="nextBtn" class="secondary-btn small">⏭</button>
-          <button id="toggleVideoBtn" class="secondary-btn">Hide video</button>
-        </div>
+    <section class="collapsible" id="statsWrapper">
+      <div class="collapse-row">
+        <button class="btn collapse-toggle" id="toggleStatsBtn">
+          <span class="arrow">›</span>
+          Stats / History Summary
+        </button>
+        <span class="pill" id="statsPill">0 sets · 0 volume</span>
       </div>
 
-      <div class="progress-row">
-        <span id="currentTimeLabel">0:00</span>
-        <input id="progressBar" type="range" min="0" max="100" value="0" />
-        <span id="durationLabel">0:00</span>
+      <div class="collapse-box">
+        <div class="stats">
+          <div class="stat"><strong id="statDays">0</strong><span>Days</span></div>
+          <div class="stat"><strong id="statExercises">0</strong><span>Exercises</span></div>
+          <div class="stat"><strong id="statCompletedSets">0</strong><span>Completed Sets</span></div>
+          <div class="stat"><strong id="statVolume">0</strong><span>Today Volume</span></div>
+          <div class="stat"><strong id="statHistory">0</strong><span>Saved Sessions</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="collapsible" id="sessionWrapper">
+      <div class="collapse-row">
+        <button class="btn collapse-toggle" id="toggleSessionBtn">
+          <span class="arrow">›</span>
+          Workout Date / Note
+        </button>
+        <span class="pill" id="datePill">Today</span>
       </div>
 
-      <div class="player-shell">
-        <div id="playerWrapper" class="player-wrapper">
-          <div class="placeholder">
-            No playlist loaded.
+      <div class="collapse-box">
+        <div class="session-grid">
+          <label>
+            <span class="label">Workout Date</span>
+            <input id="workoutDate" type="date">
+          </label>
+          <label>
+            <span class="label">Workout Note</span>
+            <input id="sessionNote" placeholder="Optional: sleep bad, PR, good pump, etc.">
+          </label>
+          <button class="btn" id="resetTodayInsideBtn">Reset Current Log</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="collapsible" id="importWrapper">
+      <div class="collapse-row">
+        <button class="btn collapse-toggle" id="toggleImportBtn">
+          <span class="arrow">›</span>
+          Import Split CSV
+        </button>
+        <span class="pill">Import only</span>
+      </div>
+
+      <div class="collapse-box">
+        <div class="csv-grid">
+          <div>
+            <label>
+              <span class="label">Paste Split CSV</span>
+              <textarea id="csvText" placeholder="day,exercise,target_sets&#10;Push,Bench Press,4&#10;Push,Incline DB Press,3&#10;Pull,Pull Ups,4"></textarea>
+            </label>
+            <div class="hint">
+              Split CSV columns: <b>day, exercise, target_sets</b>. This imports your plan only.
+            </div>
+          </div>
+          <div class="csv-buttons">
+            <button class="btn primary" id="buildSplitBtn">Build Split</button>
+            <button class="btn blue" id="importFileBtn">Import File</button>
+            <button class="btn" id="exampleBtn">Example</button>
+            <input class="hidden" id="fileInput" type="file" accept=".csv,text/csv" />
           </div>
         </div>
       </div>
     </section>
 
-    <footer class="footer">
-      <div>Local YT player UI.</div>
-      <div>Uses official YouTube embeds only.</div>
-    </footer>
-  </main>
+    <main class="split" id="split"></main>
 
-  <!-- YouTube IFrame API -->
-  <script src="https://www.youtube.com/iframe_api"></script>
+    <section class="panel">
+      <h2 style="margin:0 0 8px;">Saved Workout History</h2>
+      <p class="sub">Each exported workout is saved as its own IndexedDB session.</p>
+      <div class="history-list" id="historyList"></div>
+    </section>
+
+    <input class="hidden" id="prefillCsvInput" type="file" accept=".csv,text/csv" />
+    <div class="footer">Local-only single file app. IndexedDB stores split, current log, and saved sessions on this device.</div>
+  </div>
+
+  <div class="undo-toast" id="undoToast">
+    <span id="undoText">Deleted.</span>
+    <button class="btn primary" id="undoDeleteBtn">Undo</button>
+  </div>
 
   <script>
-    const STORAGE_KEY = "ytPlaylistList_v1";
+    const DB_NAME = "SplitLogIndexedDB";
+    const DB_VERSION = 1;
 
-    let playlists = [];
-    let currentPlaylistId = null;
-    let videoCollapsed = false;
+    const exampleCSV = `day,exercise,target_sets
+Push,Bench Press,4
+Push,Incline DB Press,3
+Push,Lateral Raise,4
+Push,Triceps Pushdown,3
+Pull,Pull Ups,4
+Pull,Barbell Row,3
+Pull,Curls,3
+Legs,Squat,4
+Legs,RDL,3
+Legs,Leg Press,3`;
 
-    let ytApiReady = false;
-    let ytPlayer = null;
-    let progressTimer = null;
+    let db = null;
+    let meta = {
+      workoutDate: todayISO(),
+      sessionNote: "",
+      importOpen: false,
+      sessionOpen: false,
+      statsOpen: false,
+      openDays: {},
+      openExercises: {}
+    };
+    let exercises = [];
+    let history = [];
+    let lastDeletedHistory = null;
+    let undoTimer = null;
 
-    const playlistListEl = document.getElementById("playlistList");
-    const emptyStateEl = document.getElementById("emptyState");
-    const playlistNameInput = document.getElementById("playlistNameInput");
-    const playlistUrlInput = document.getElementById("playlistUrlInput");
-    const savePlaylistBtn = document.getElementById("savePlaylistBtn");
-    const playerWrapper = document.getElementById("playerWrapper");
-    const nowPlayingTitle = document.getElementById("nowPlayingTitle");
-    const nowPlayingMeta = document.getElementById("nowPlayingMeta");
-    const toggleVideoBtn = document.getElementById("toggleVideoBtn");
+    function todayISO() {
+      const d = new Date();
+      const tzOffset = d.getTimezoneOffset() * 60000;
+      return new Date(d - tzOffset).toISOString().slice(0, 10);
+    }
 
-    const prevBtn = document.getElementById("prevBtn");
-    const playPauseBtn = document.getElementById("playPauseBtn");
-    const nextBtn = document.getElementById("nextBtn");
-    const progressBar = document.getElementById("progressBar");
-    const currentTimeLabel = document.getElementById("currentTimeLabel");
-    const durationLabel = document.getElementById("durationLabel");
+    function makeId() {
+      return globalThis.crypto?.randomUUID
+        ? globalThis.crypto.randomUUID()
+        : String(Date.now() + Math.random());
+    }
 
-    function loadFromStorage() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return;
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          playlists = parsed;
+    function makeExercise(day, name, targetSets, order = 0, dayOrder = 0) {
+      const count = Math.max(1, Number(targetSets || 1));
+      return {
+        id: makeId(),
+        day,
+        day_order: Number(dayOrder || 0),
+        name,
+        target_sets: count,
+        order: Number(order || 0),
+        created_at: Date.now(),
+        sets: Array.from({ length: count }, (_, i) => ({
+          set_number: i + 1,
+          reps: "",
+          weight: "",
+          completed: false
+        }))
+      };
+    }
+
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        if (!("indexedDB" in window)) {
+          reject(new Error("IndexedDB is not available in this browser."));
+          return;
         }
-      } catch (e) {
-        console.error("Failed to load playlists:", e);
-      }
-    }
 
-    function saveToStorage() {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(playlists));
-      } catch (e) {
-        console.error("Failed to save playlists:", e);
-      }
-    }
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
 
-    function extractPlaylistId(raw) {
-      if (!raw) return null;
-      raw = raw.trim();
+        req.onupgradeneeded = event => {
+          const database = event.target.result;
 
-      const match = raw.match(/[?&]list=([^&]+)/);
-      if (match) return match[1];
+          if (!database.objectStoreNames.contains("meta")) {
+            database.createObjectStore("meta", { keyPath: "key" });
+          }
 
-      if (/^[A-Za-z0-9_-]{10,}$/.test(raw)) {
-        return raw;
-      }
+          if (!database.objectStoreNames.contains("exercises")) {
+            const store = database.createObjectStore("exercises", { keyPath: "id" });
+            store.createIndex("day", "day", { unique: false });
+          }
 
-      return null;
-    }
+          if (!database.objectStoreNames.contains("history")) {
+            database.createObjectStore("history", { keyPath: "id", autoIncrement: true });
+          }
+        };
 
-    function renderPlaylists() {
-      playlistListEl.innerHTML = "";
-
-      if (!playlists.length) {
-        emptyStateEl.style.display = "block";
-        return;
-      }
-
-      emptyStateEl.style.display = "none";
-
-      playlists.forEach((pl) => {
-        const item = document.createElement("div");
-        item.className = "playlist-item" + (pl.id === currentPlaylistId ? " active" : "");
-        item.dataset.playlistId = pl.id;
-
-        const topRow = document.createElement("div");
-        topRow.className = "playlist-item-top";
-
-        const nameSpan = document.createElement("span");
-        nameSpan.className = "playlist-name";
-        nameSpan.textContent = pl.name || "(Untitled)";
-
-        const actions = document.createElement("div");
-        actions.className = "playlist-actions";
-
-        const playBtn = document.createElement("button");
-        playBtn.className = "icon-btn";
-        playBtn.textContent = "▶";
-        playBtn.title = "Play";
-
-        const deleteBtn = document.createElement("button");
-        deleteBtn.className = "icon-btn";
-        deleteBtn.textContent = "✕";
-        deleteBtn.title = "Delete";
-
-        actions.appendChild(playBtn);
-        actions.appendChild(deleteBtn);
-
-        topRow.appendChild(nameSpan);
-        topRow.appendChild(actions);
-
-        const idSpan = document.createElement("span");
-        idSpan.className = "playlist-id";
-        idSpan.textContent = pl.id;
-
-        item.appendChild(topRow);
-        item.appendChild(idSpan);
-
-        item.addEventListener("click", (event) => {
-          if (event.target === deleteBtn || event.target === playBtn) return;
-          setCurrentPlaylist(pl.id);
-        });
-
-        playBtn.addEventListener("click", (event) => {
-          event.stopPropagation();
-          setCurrentPlaylist(pl.id);
-        });
-
-        deleteBtn.addEventListener("click", (event) => {
-          event.stopPropagation();
-          deletePlaylist(pl.id);
-        });
-
-        playlistListEl.appendChild(item);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
       });
     }
 
-    function renderPlayer() {
-      const playlist = playlists.find((p) => p.id === currentPlaylistId);
+    function tx(storeName, mode = "readonly") {
+      return db.transaction(storeName, mode).objectStore(storeName);
+    }
 
-      if (!playlist) {
-        if (ytPlayer) {
-          try {
-            ytPlayer.stopVideo();
-          } catch (e) {}
+    function requestToPromise(req) {
+      return new Promise((resolve, reject) => {
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function getAll(storeName) {
+      return requestToPromise(tx(storeName).getAll());
+    }
+
+    async function put(storeName, value) {
+      return requestToPromise(tx(storeName, "readwrite").put(value));
+    }
+
+    async function del(storeName, key) {
+      return requestToPromise(tx(storeName, "readwrite").delete(key));
+    }
+
+    async function clearStore(storeName) {
+      return requestToPromise(tx(storeName, "readwrite").clear());
+    }
+
+    async function saveMeta() {
+      await put("meta", { key: "app", value: meta });
+    }
+
+    async function loadAll() {
+      const metaRow = await requestToPromise(tx("meta").get("app"));
+      if (metaRow && metaRow.value) {
+        meta = { ...meta, ...metaRow.value };
+      } else {
+        await saveMeta();
+      }
+
+      if (!meta.openExercises || typeof meta.openExercises !== "object") {
+        meta.openExercises = {};
+      }
+
+      exercises = await getAll("exercises");
+      history = await getAll("history");
+
+      const dayOrderFallback = {};
+      let nextDayOrderFallback = 0;
+      exercises.forEach((ex, index) => {
+        if (!(ex.day in dayOrderFallback)) dayOrderFallback[ex.day] = nextDayOrderFallback++;
+        if (ex.day_order === undefined) ex.day_order = dayOrderFallback[ex.day];
+        if (ex.order === undefined) ex.order = index;
+      });
+
+      exercises.sort((a, b) => {
+        const dayA = Number(a.day_order ?? 999999);
+        const dayB = Number(b.day_order ?? 999999);
+        if (dayA !== dayB) return dayA - dayB;
+
+        if (String(a.day) === String(b.day)) {
+          const orderA = Number(a.order ?? 999999);
+          const orderB = Number(b.order ?? 999999);
+          if (orderA !== orderB) return orderA - orderB;
+          return Number(a.created_at || 0) - Number(b.created_at || 0);
         }
-        playerWrapper.innerHTML = "";
-        const placeholder = document.createElement("div");
-        placeholder.className = "placeholder";
-        placeholder.textContent = "No playlist loaded.";
-        playerWrapper.appendChild(placeholder);
 
-        nowPlayingTitle.textContent = "Nothing playing";
-        nowPlayingMeta.textContent = "Select or save a playlist.";
-        progressBar.value = 0;
-        currentTimeLabel.textContent = "0:00";
-        durationLabel.textContent = "0:00";
-        return;
-      }
+        return String(a.day).localeCompare(String(b.day));
+      });
 
-      nowPlayingTitle.textContent = playlist.name || "Untitled playlist";
-      nowPlayingMeta.textContent = playlist.id;
-
-      ensurePlayerCreated(playlist.id);
+      history.sort((a, b) => (a.exported_at || "").localeCompare(b.exported_at || ""));
+      for (const ex of exercises) await put("exercises", ex);
     }
 
-    function ensurePlayerCreated(playlistId) {
-      let frame = document.getElementById("playerFrame");
-      if (!frame) {
-        playerWrapper.innerHTML = "";
-        frame = document.createElement("div");
-        frame.id = "playerFrame";
-        playerWrapper.appendChild(frame);
-      }
+    async function importSplitCSV(text) {
+      const rows = parseCSV(text);
+      if (!rows.length) return alert("CSV is empty.");
 
-      if (!ytApiReady) {
-        return;
-      }
+      const header = rows[0].map(h => h.trim().toLowerCase());
+      const hasHeader = header.includes("day") && header.includes("exercise");
 
-      if (!ytPlayer) {
-        ytPlayer = new YT.Player("playerFrame", {
-          height: "100%",
-          width: "100%",
-          playerVars: {
-            listType: "playlist",
-            list: playlistId,
-            autoplay: 1,
-          },
-          events: {
-            onReady: onPlayerReady,
-            onStateChange: onPlayerStateChange,
-          },
-        });
-      } else {
-        ytPlayer.loadPlaylist({
-          listType: "playlist",
-          list: playlistId,
-        });
-        ytPlayer.playVideo();
-      }
-    }
-
-    function onPlayerReady() {
-      // nothing extra
-    }
-
-    function updateNowPlayingFromPlayer() {
-      if (!ytPlayer || typeof ytPlayer.getVideoData !== "function") return;
-      const data = ytPlayer.getVideoData() || {};
-      const title = data.title || "Playing";
-      const author = data.author || "";
-      nowPlayingTitle.textContent = title;
-      if (author && currentPlaylistId) {
-        nowPlayingMeta.textContent = `${author} • ${currentPlaylistId}`;
-      } else if (author) {
-        nowPlayingMeta.textContent = author;
-      } else if (currentPlaylistId) {
-        nowPlayingMeta.textContent = currentPlaylistId;
-      } else {
-        nowPlayingMeta.textContent = "";
-      }
-    }
-
-    function onPlayerStateChange(event) {
-      const state = event.data;
-      if (!ytPlayer) return;
-
-      if (state === YT.PlayerState.PLAYING) {
-        playPauseBtn.textContent = "⏸";
-        updateNowPlayingFromPlayer(); // <- song name + author
-        startProgressTimer();
-      } else if (
-        state === YT.PlayerState.PAUSED ||
-        state === YT.PlayerState.ENDED
-      ) {
-        playPauseBtn.textContent = "▶";
-        stopProgressTimer();
-
-        if (state === YT.PlayerState.ENDED) {
-          const duration = ytPlayer.getDuration() || 0;
-          updateProgressUI(duration, duration);
-        }
-      }
-    }
-
-    function startProgressTimer() {
-      if (progressTimer) return;
-      progressTimer = setInterval(() => {
-        if (!ytPlayer || typeof ytPlayer.getCurrentTime !== "function") return;
-        const current = ytPlayer.getCurrentTime() || 0;
-        const duration = ytPlayer.getDuration() || 0;
-        updateProgressUI(current, duration);
-      }, 500);
-    }
-
-    function stopProgressTimer() {
-      if (progressTimer) {
-        clearInterval(progressTimer);
-        progressTimer = null;
-      }
-    }
-
-    function updateProgressUI(current, duration) {
-      currentTimeLabel.textContent = formatTime(current);
-      durationLabel.textContent = duration ? formatTime(duration) : "0:00";
-      if (duration > 0) {
-        progressBar.value = (current / duration) * 100;
-      } else {
-        progressBar.value = 0;
-      }
-    }
-
-    function formatTime(seconds) {
-      seconds = Math.floor(seconds || 0);
-      const h = Math.floor(seconds / 3600);
-      const m = Math.floor((seconds % 3600) / 60);
-      const s = seconds % 60;
-      const mm = h > 0 ? String(m).padStart(2, "0") : String(m);
-      const ss = String(s).padStart(2, "0");
-      return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
-    }
-
-    function updateVideoToggleUI() {
-      if (videoCollapsed) {
-        playerWrapper.classList.add("collapsed");
-        toggleVideoBtn.textContent = "Show video";
-      } else {
-        playerWrapper.classList.remove("collapsed");
-        toggleVideoBtn.textContent = "Hide video";
-      }
-    }
-
-    function setCurrentPlaylist(playlistId) {
-      currentPlaylistId = playlistId;
-      renderPlaylists();
-      renderPlayer();
-    }
-
-    function addPlaylist(name, urlOrId) {
-      const id = extractPlaylistId(urlOrId);
-      if (!id) {
-        alert("Invalid playlist URL/ID.");
-        return;
-      }
-
-      const existing = playlists.find((p) => p.id === id);
-      if (existing) {
-        existing.name = name || existing.name;
-        setCurrentPlaylist(existing.id);
-        saveToStorage();
-        renderPlaylists();
-        return;
-      }
-
-      const playlist = {
-        id,
-        name: name || "Untitled",
-        createdAt: Date.now(),
+      const idx = {
+        day: hasHeader ? header.indexOf("day") : 0,
+        exercise: hasHeader ? header.indexOf("exercise") : 1,
+        target_sets: hasHeader ? header.indexOf("target_sets") : 2
       };
 
-      playlists.push(playlist);
-      saveToStorage();
-      setCurrentPlaylist(id);
-      renderPlaylists();
-    }
+      const next = [];
+      const openDays = {};
+      const dayOrderMap = {};
+      let nextDayOrder = 0;
 
-    function deletePlaylist(playlistId) {
-      const confirmed = confirm("Delete this playlist?");
-      if (!confirmed) return;
+      for (let i = hasHeader ? 1 : 0; i < rows.length; i++) {
+        const r = rows[i];
+        const day = String(r[idx.day] || "Workout").trim();
+        const name = String(r[idx.exercise] || "").trim();
+        const target = Number(r[idx.target_sets] || 1);
+        if (!name) continue;
 
-      playlists = playlists.filter((p) => p.id !== playlistId);
+        if (!(day in dayOrderMap)) {
+          dayOrderMap[day] = nextDayOrder++;
+        }
 
-      if (currentPlaylistId === playlistId) {
-        currentPlaylistId = playlists[0]?.id || null;
+        next.push(makeExercise(day, name, target || 1, next.length, dayOrderMap[day]));
+        openDays[day] = false;
       }
 
-      saveToStorage();
-      renderPlaylists();
-      renderPlayer();
+      if (!next.length) return alert("No valid exercises found.");
+
+      openDays[next[0].day] = true;
+
+      await clearStore("exercises");
+      for (const ex of next) await put("exercises", ex);
+
+      exercises = next;
+      meta.openDays = openDays;
+      meta.openExercises = {};
+      meta.importOpen = false;
+      await saveMeta();
+      render();
     }
 
-    savePlaylistBtn.addEventListener("click", () => {
-      const name = playlistNameInput.value.trim();
-      const url = playlistUrlInput.value.trim();
+    function getDays() {
+      const days = [];
+      exercises.forEach(ex => {
+        if (!days.includes(ex.day)) days.push(ex.day);
+      });
+      return days;
+    }
 
-      if (!url) {
-        alert("Paste a playlist URL/ID first.");
+    function getExercisesForDay(day) {
+      return exercises.filter(ex => ex.day === day);
+    }
+
+    function getSessionRows() {
+      const rows = [];
+      exercises.forEach(ex => {
+        ex.sets.forEach(set => {
+          rows.push({
+            date: meta.workoutDate,
+            day: ex.day,
+            exercise: ex.name,
+            set_number: set.set_number,
+            reps: set.reps,
+            weight: set.weight,
+            completed: !!set.completed,
+            note: meta.sessionNote || ""
+          });
+        });
+      });
+      return rows;
+    }
+
+    function getLoggedSessionRows() {
+      return getSessionRows().filter(r =>
+        r.completed || Number(r.reps || 0) > 0 || Number(r.weight || 0) > 0
+      );
+    }
+
+    function render() {
+      document.getElementById("workoutDate").value = meta.workoutDate || todayISO();
+      document.getElementById("sessionNote").value = meta.sessionNote || "";
+      renderCollapsibles();
+      renderStats();
+      renderSplit();
+      renderHistory();
+    }
+
+    function renderCollapsibles() {
+      document.getElementById("statsWrapper").classList.toggle("open", !!meta.statsOpen);
+      document.getElementById("sessionWrapper").classList.toggle("open", !!meta.sessionOpen);
+      document.getElementById("importWrapper").classList.toggle("open", !!meta.importOpen);
+      document.getElementById("datePill").textContent = meta.workoutDate || todayISO();
+    }
+
+    function renderStats() {
+      const days = getDays();
+      const sessionRows = getSessionRows();
+      const completedSets = sessionRows.filter(r => r.completed).length;
+      const volume = sessionRows.reduce((sum, r) => {
+        return sum + Number(r.reps || 0) * Number(r.weight || 0);
+      }, 0);
+
+      document.getElementById("statDays").textContent = days.length;
+      document.getElementById("statExercises").textContent = exercises.length;
+      document.getElementById("statCompletedSets").textContent = completedSets;
+      document.getElementById("statVolume").textContent = Math.round(volume).toLocaleString();
+      document.getElementById("statHistory").textContent = history.length;
+      document.getElementById("statsPill").textContent = `${completedSets} sets · ${Math.round(volume).toLocaleString()} volume`;
+    }
+
+    function renderSplit() {
+      const root = document.getElementById("split");
+      root.innerHTML = "";
+
+      const days = getDays();
+      if (!days.length) {
+        root.innerHTML = `<div class="empty">No split loaded. Open Import Split CSV and import your split.</div>`;
         return;
       }
 
-      addPlaylist(name, url);
-    });
+      days.forEach(day => {
+        const dayExercises = getExercisesForDay(day);
+        const totalSets = dayExercises.reduce((n, ex) => n + ex.sets.length, 0);
+        const doneSets = dayExercises.reduce((n, ex) => n + ex.sets.filter(s => s.completed).length, 0);
+        const percent = totalSets ? Math.round((doneSets / totalSets) * 100) : 0;
+        const isOpen = !!meta.openDays[day];
 
-    [playlistNameInput, playlistUrlInput].forEach((input) => {
-      input.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") {
-          savePlaylistBtn.click();
-        }
+        const card = document.createElement("section");
+        card.className = "day-card" + (isOpen ? " open" : "");
+        card.innerHTML = `
+          <div class="day-head" onclick="toggleDay(${js(day)})" onkeydown="handleToggleKey(event, () => toggleDay(${js(day)}))" role="button" tabindex="0">
+            <div>
+              <div class="day-title-row">
+                <span class="chev">›</span>
+                <span class="day-name">${esc(day)}</span>
+                <span class="pill">${dayExercises.length} exercises</span>
+                <span class="pill">${doneSets}/${totalSets} sets</span>
+                <span class="pill done">${percent}%</span>
+              </div>
+            </div>
+            <div class="day-progress"><div class="bar" style="width:${percent}%"></div></div>
+          </div>
+
+          <div class="day-body">
+            ${dayExercises.map(ex => exerciseHTML(ex)).join("")}
+          </div>
+        `;
+        root.appendChild(card);
       });
-    });
+    }
 
-    toggleVideoBtn.addEventListener("click", () => {
-      videoCollapsed = !videoCollapsed;
-      updateVideoToggleUI();
-    });
+    function exerciseHTML(ex) {
+      const doneSets = ex.sets.filter(s => s.completed).length;
+      const totalSets = ex.sets.length;
+      const isOpen = !!meta.openExercises?.[ex.id];
 
-    prevBtn.addEventListener("click", () => {
-      if (!ytPlayer) return;
-      try {
-        ytPlayer.previousVideo();
-      } catch (e) {}
-    });
+      return `
+        <div class="exercise-card ${isOpen ? "open" : ""}">
+          <div class="exercise-top" onclick="toggleExercise(${js(ex.id)})" onkeydown="handleToggleKey(event, () => toggleExercise(${js(ex.id)}))" role="button" tabindex="0">
+            <div class="ex-title">
+              <div class="exercise-title-row">
+                <span class="exercise-chevron">›</span>
+                <span>${esc(ex.name)}</span>
+                <span class="pill">${doneSets}/${totalSets} sets</span>
+              </div>
+              <small>${doneSets}/${totalSets} sets completed</small>
+            </div>
+            <div class="exercise-actions">
+              <button class="mini-btn" title="Add set" onclick="event.stopPropagation(); addSet(${js(ex.id)})">+</button>
+            </div>
+          </div>
 
-    nextBtn.addEventListener("click", () => {
-      if (!ytPlayer) return;
-      try {
-        ytPlayer.nextVideo();
-      } catch (e) {}
-    });
+          <div class="exercise-body">
+            <div class="set-grid">
+              ${ex.sets.map((set, setIndex) => `
+                <div class="set-row">
+                  <div class="set-num">#${set.set_number}</div>
+                  <input class="check" type="checkbox" ${set.completed ? "checked" : ""} onchange="updateSet(${js(ex.id)}, ${setIndex}, 'completed', this.checked)">
+                  <label>
+                    <span class="label">Reps</span>
+                    <input type="number" min="0" value="${esc(set.reps)}" oninput="updateSet(${js(ex.id)}, ${setIndex}, 'reps', this.value)">
+                  </label>
+                  <label>
+                    <span class="label">Weight</span>
+                    <input type="number" min="0" step="0.5" value="${esc(set.weight)}" oninput="updateSet(${js(ex.id)}, ${setIndex}, 'weight', this.value)">
+                  </label>
+                  <button class="mini-btn danger" onclick="deleteSet(${js(ex.id)}, ${setIndex})">−</button>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        </div>
+      `;
+    }
 
-    playPauseBtn.addEventListener("click", () => {
-      if (!ytPlayer || typeof ytPlayer.getPlayerState !== "function") return;
-      const state = ytPlayer.getPlayerState();
-      if (state === YT.PlayerState.PLAYING) {
-        ytPlayer.pauseVideo();
+    function renderHistory() {
+      const root = document.getElementById("historyList");
+      if (!history.length) {
+        root.innerHTML = `<div class="empty">No exported sessions yet.</div>`;
+        return;
+      }
+
+      const latest = [...history].slice(-8).reverse();
+      root.innerHTML = latest.map(h => `
+        <div class="history-item">
+          <div>
+            <strong style="color:var(--text);">${esc(h.date)}</strong>
+            <span> · ${h.rows} rows · ${h.completed_sets} completed sets · volume ${Number(h.volume || 0).toLocaleString()}</span>
+          </div>
+          <div class="history-actions">
+            <button class="btn" onclick="downloadHistoryItem(${Number(h.id)})">Download</button>
+            <button class="mini-btn danger" title="Delete history item" onclick="deleteHistoryItem(${Number(h.id)})">×</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    window.toggleDay = async function(day) {
+      meta.openDays[day] = !meta.openDays[day];
+      await saveMeta();
+      render();
+    };
+
+    window.toggleExercise = async function(exId) {
+      if (!meta.openExercises || typeof meta.openExercises !== "object") {
+        meta.openExercises = {};
+      }
+      meta.openExercises[exId] = !meta.openExercises[exId];
+      await saveMeta();
+      render();
+    };
+
+    window.updateSet = async function(exId, setIndex, key, value) {
+      const ex = exercises.find(x => x.id === exId);
+      if (!ex || !ex.sets[setIndex]) return;
+
+      if (key === "completed") {
+        ex.sets[setIndex].completed = !!value;
       } else {
-        ytPlayer.playVideo();
+        ex.sets[setIndex][key] = value;
       }
-    });
 
-    progressBar.addEventListener("input", () => {
-      if (!ytPlayer || typeof ytPlayer.getDuration !== "function") return;
-      const duration = ytPlayer.getDuration() || 0;
-      if (!duration) return;
-      const percent = parseFloat(progressBar.value) || 0;
-      const target = (percent / 100) * duration;
-      ytPlayer.seekTo(target, true);
-    });
+      await put("exercises", ex);
+      renderStats();
 
-    window.addEventListener("DOMContentLoaded", () => {
-      loadFromStorage();
-      if (playlists.length) {
-        currentPlaylistId = playlists[0].id;
+      // Re-render only when checkbox/progress changed.
+      // Reps/weight typing should not rebuild the whole UI and cause jumpiness.
+      if (key === "completed") {
+        renderSplit();
       }
-      renderPlaylists();
-      renderPlayer();
-      updateVideoToggleUI();
-    });
+    };
 
-    // YouTube API callback
-    function onYouTubeIframeAPIReady() {
-      ytApiReady = true;
-      if (currentPlaylistId) {
-        ensurePlayerCreated(currentPlaylistId);
+    window.addSet = async function(exId) {
+      const ex = exercises.find(x => x.id === exId);
+      if (!ex) return;
+
+      ex.sets.push({
+        set_number: ex.sets.length + 1,
+        reps: "",
+        weight: "",
+        completed: false
+      });
+      ex.target_sets = ex.sets.length;
+
+      if (!meta.openExercises || typeof meta.openExercises !== "object") {
+        meta.openExercises = {};
+      }
+      meta.openExercises[ex.id] = true;
+
+      await saveMeta();
+      await put("exercises", ex);
+      render();
+    };
+
+    window.deleteSet = async function(exId, setIndex) {
+      const ex = exercises.find(x => x.id === exId);
+      if (!ex) return;
+      if (ex.sets.length <= 1) return alert("Keep at least one set.");
+
+      ex.sets.splice(setIndex, 1);
+      ex.sets.forEach((s, i) => s.set_number = i + 1);
+      ex.target_sets = ex.sets.length;
+
+      await put("exercises", ex);
+      render();
+    };
+
+    window.downloadHistoryItem = function(id) {
+      const item = history.find(h => Number(h.id) === Number(id));
+      if (!item) return;
+      downloadCSV(sessionRowsToCSV(item.data || []), `workout-session-${item.date}.csv`);
+    };
+
+    window.deleteHistoryItem = async function(id) {
+      const index = history.findIndex(h => Number(h.id) === Number(id));
+      if (index < 0) return;
+
+      const item = history[index];
+      lastDeletedHistory = { item };
+      await del("history", id);
+      history.splice(index, 1);
+
+      renderHistory();
+      renderStats();
+      showUndoToast(`Deleted ${item.date} history.`);
+
+      clearTimeout(undoTimer);
+      undoTimer = setTimeout(() => {
+        lastDeletedHistory = null;
+        hideUndoToast();
+      }, 6500);
+    };
+
+    async function resetToday() {
+      if (!confirm("Reset today's checkboxes, reps, and weights only?")) return;
+
+      for (const ex of exercises) {
+        ex.sets.forEach(set => {
+          set.reps = "";
+          set.weight = "";
+          set.completed = false;
+        });
+        await put("exercises", ex);
+      }
+
+      meta.sessionNote = "";
+      await saveMeta();
+      render();
+    }
+
+    async function clearAll() {
+      if (!confirm("CLEAR ALL deletes your split, current log, imported CSV text, and all saved history. Continue?")) return;
+
+      await clearStore("exercises");
+      await clearStore("history");
+
+      meta = {
+        workoutDate: todayISO(),
+        sessionNote: "",
+        importOpen: true,
+        sessionOpen: false,
+        statsOpen: false,
+        openDays: {},
+        openExercises: {}
+      };
+
+      await saveMeta();
+
+      exercises = [];
+      history = [];
+      lastDeletedHistory = null;
+      clearTimeout(undoTimer);
+
+      document.getElementById("csvText").value = "";
+      document.getElementById("fileInput").value = "";
+      const prefillCsvInput = document.getElementById("prefillCsvInput");
+      if (prefillCsvInput) prefillCsvInput.value = "";
+      hideUndoToast();
+      render();
+    }
+
+    async function prefillLastSession() {
+      if (!history.length) return alert("No previous session history found yet.");
+
+      const sortedHistory = [...history].sort((a, b) =>
+        String(a.exported_at || "").localeCompare(String(b.exported_at || ""))
+      );
+      const latest = sortedHistory[sortedHistory.length - 1];
+      const latestByExercise = {};
+
+      (latest.data || []).forEach(r => {
+        const dayName = String(r.day || "").trim().toLowerCase();
+        const exName = String(r.exercise || "").trim().toLowerCase();
+        const key = `${dayName}::${exName}`;
+        const setNum = Number(r.set_number || 1);
+        const hasUsefulValue = Number(r.reps || 0) > 0 || Number(r.weight || 0) > 0;
+
+        if (!dayName || !exName || !hasUsefulValue) return;
+        if (!latestByExercise[key]) latestByExercise[key] = {};
+        latestByExercise[key][setNum] = { reps: r.reps, weight: r.weight };
+      });
+
+      let filled = 0;
+
+      for (const ex of exercises) {
+        const dayName = String(ex.day || "").trim().toLowerCase();
+        const exName = String(ex.name || "").trim().toLowerCase();
+        const savedSets = latestByExercise[`${dayName}::${exName}`];
+        if (!savedSets) continue;
+
+        const savedSetNumbers = Object.keys(savedSets).map(Number).filter(Number.isFinite).sort((a, b) => a - b);
+        if (!savedSetNumbers.length) continue;
+
+        const highestSavedSet = savedSetNumbers[savedSetNumbers.length - 1];
+
+        ex.sets.forEach(set => {
+          const currentSetNum = Number(set.set_number || 1);
+          const fallbackSetNum = Math.min(currentSetNum, highestSavedSet);
+          const last = savedSets[currentSetNum] || savedSets[fallbackSetNum];
+
+          if (last) {
+            set.reps = last.reps;
+            set.weight = last.weight;
+            // Do not touch completion.
+            filled++;
+          }
+        });
+
+        await put("exercises", ex);
+      }
+
+      render();
+      alert(filled ? `Prefilled ${filled} rows from the last saved session. Reps + weight only; checkboxes untouched.` : "Last session had no matching exercises.");
+    }
+
+
+    async function prefillFromWorkoutCSV(text) {
+      const rows = parseCSV(text);
+      if (!rows.length) return alert("CSV is empty.");
+
+      const header = rows[0].map(h => h.trim().toLowerCase());
+      const hasHeader = header.includes("exercise") && header.includes("set_number");
+
+      const idx = {
+        day: hasHeader ? header.indexOf("day") : 1,
+        exercise: hasHeader ? header.indexOf("exercise") : 2,
+        set_number: hasHeader ? header.indexOf("set_number") : 3,
+        reps: hasHeader ? header.indexOf("reps") : 4,
+        weight: hasHeader ? header.indexOf("weight") : 5
+      };
+
+      if (idx.day < 0 || idx.exercise < 0 || idx.set_number < 0 || idx.reps < 0 || idx.weight < 0) {
+        return alert("This does not look like a workout CSV. Needed columns: day, exercise, set_number, reps, weight.");
+      }
+
+      const latestByExercise = {};
+
+      for (let i = hasHeader ? 1 : 0; i < rows.length; i++) {
+        const r = rows[i];
+        const dayName = String(r[idx.day] || "").trim().toLowerCase();
+        const exName = String(r[idx.exercise] || "").trim().toLowerCase();
+        const key = `${dayName}::${exName}`;
+        const setNum = Number(r[idx.set_number] || 1);
+        const reps = r[idx.reps] ?? "";
+        const weight = r[idx.weight] ?? "";
+        const hasUsefulValue = Number(reps || 0) > 0 || Number(weight || 0) > 0;
+
+        if (!dayName || !exName || !Number.isFinite(setNum) || !hasUsefulValue) continue;
+        if (!latestByExercise[key]) latestByExercise[key] = {};
+
+        latestByExercise[key][setNum] = { reps, weight };
+      }
+
+      let filled = 0;
+
+      for (const ex of exercises) {
+        const dayName = String(ex.day || "").trim().toLowerCase();
+        const exName = String(ex.name || "").trim().toLowerCase();
+        const savedSets = latestByExercise[`${dayName}::${exName}`];
+        if (!savedSets) continue;
+
+        const savedSetNumbers = Object.keys(savedSets).map(Number).filter(Number.isFinite).sort((a, b) => a - b);
+        if (!savedSetNumbers.length) continue;
+
+        const highestSavedSet = savedSetNumbers[savedSetNumbers.length - 1];
+
+        ex.sets.forEach(set => {
+          const currentSetNum = Number(set.set_number || 1);
+          const fallbackSetNum = Math.min(currentSetNum, highestSavedSet);
+          const last = savedSets[currentSetNum] || savedSets[fallbackSetNum];
+
+          if (last) {
+            set.reps = last.reps;
+            set.weight = last.weight;
+            // Do not touch completion checkbox.
+            filled++;
+          }
+        });
+
+        await put("exercises", ex);
+      }
+
+      render();
+      alert(filled ? `Prefilled ${filled} rows from CSV. Reps + weight only; checkboxes untouched.` : "No matching exercise/set values found in that CSV.");
+    }
+
+    async function exportToday() {
+      const logged = getLoggedSessionRows();
+      if (!logged.length && !confirm("No sets logged yet. Export empty session anyway?")) return;
+
+      const allRows = getSessionRows();
+      const completedRows = allRows.filter(r => r.completed);
+      const volume = allRows.reduce((sum, r) => sum + Number(r.reps || 0) * Number(r.weight || 0), 0);
+
+      const record = {
+        date: meta.workoutDate,
+        exported_at: new Date().toISOString(),
+        rows: allRows.length,
+        completed_sets: completedRows.length,
+        volume: Math.round(volume),
+        data: allRows
+      };
+
+      const newId = await requestToPromise(tx("history", "readwrite").add(record));
+      record.id = newId;
+      history.push(record);
+      history.sort((a, b) => String(a.exported_at || "").localeCompare(String(b.exported_at || "")));
+
+      renderHistory();
+      renderStats();
+      downloadCSV(sessionRowsToCSV(allRows), `workout-session-${meta.workoutDate}.csv`);
+    }
+
+    function exportHistory() {
+      const rows = history.flatMap(h => h.data || []);
+      if (!rows.length) return alert("No history yet. Export today's workout first.");
+      downloadCSV(sessionRowsToCSV(rows), "workout-history-all.csv");
+    }
+
+    function showUndoToast(text) {
+      document.getElementById("undoText").textContent = text;
+      document.getElementById("undoToast").classList.add("show");
+    }
+
+    function hideUndoToast() {
+      document.getElementById("undoToast").classList.remove("show");
+    }
+
+    function sessionRowsToCSV(rows) {
+      const csvRows = [["date", "day", "exercise", "set_number", "reps", "weight", "completed", "note"]];
+      rows.forEach(r => {
+        csvRows.push([
+          r.date,
+          r.day,
+          r.exercise,
+          r.set_number,
+          r.reps,
+          r.weight,
+          r.completed ? "true" : "false",
+          r.note || ""
+        ]);
+      });
+      return csvRows.map(r => r.map(csvEscape).join(",")).join("\n");
+    }
+
+    function parseCSV(text) {
+      const rows = [];
+      let row = [];
+      let cell = "";
+      let quote = false;
+
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        const n = text[i + 1];
+
+        if (c === '"' && quote && n === '"') {
+          cell += '"';
+          i++;
+        } else if (c === '"') {
+          quote = !quote;
+        } else if (c === "," && !quote) {
+          row.push(cell);
+          cell = "";
+        } else if ((c === "\n" || c === "\r") && !quote) {
+          if (c === "\r" && n === "\n") i++;
+          row.push(cell);
+          if (row.some(x => String(x).trim() !== "")) rows.push(row);
+          row = [];
+          cell = "";
+        } else {
+          cell += c;
+        }
+      }
+
+      row.push(cell);
+      if (row.some(x => String(x).trim() !== "")) rows.push(row);
+      return rows;
+    }
+
+    function downloadCSV(csv, filename) {
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function csvEscape(v) {
+      v = String(v ?? "");
+      if (/[",\n\r]/.test(v)) return '"' + v.replace(/"/g, '""') + '"';
+      return v;
+    }
+
+    function esc(v) {
+      return String(v ?? "").replace(/[&<>"']/g, c => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+      }[c]));
+    }
+
+    function js(v) {
+      return JSON.stringify(String(v ?? ""))
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function handleToggleKey(event, callback) {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        callback();
       }
     }
+
+    async function init() {
+      try {
+        db = await openDB();
+        await loadAll();
+        render();
+
+        document.getElementById("toggleStatsBtn").onclick = async () => {
+          meta.statsOpen = !meta.statsOpen;
+          await saveMeta();
+          renderCollapsibles();
+        };
+
+        document.getElementById("toggleSessionBtn").onclick = async () => {
+          meta.sessionOpen = !meta.sessionOpen;
+          await saveMeta();
+          renderCollapsibles();
+        };
+
+        document.getElementById("toggleImportBtn").onclick = async () => {
+          meta.importOpen = !meta.importOpen;
+          await saveMeta();
+          renderCollapsibles();
+        };
+
+        document.getElementById("workoutDate").addEventListener("change", async e => {
+          meta.workoutDate = e.target.value || todayISO();
+          await saveMeta();
+          render();
+        });
+
+        document.getElementById("sessionNote").addEventListener("input", async e => {
+          meta.sessionNote = e.target.value;
+          await saveMeta();
+        });
+
+        document.getElementById("buildSplitBtn").onclick = async () => {
+          const text = document.getElementById("csvText").value.trim();
+          if (!text) return alert("Paste split CSV first.");
+          await importSplitCSV(text);
+        };
+
+        document.getElementById("importFileBtn").onclick = () => {
+          document.getElementById("fileInput").click();
+        };
+
+        document.getElementById("fileInput").onchange = async e => {
+          const file = e.target.files[0];
+          if (!file) return;
+          await importSplitCSV(await file.text());
+          e.target.value = "";
+        };
+
+        document.getElementById("exampleBtn").onclick = async () => {
+          document.getElementById("csvText").value = exampleCSV;
+          meta.importOpen = true;
+          await saveMeta();
+          renderCollapsibles();
+        };
+
+        document.getElementById("exportTodayBtn").onclick = exportToday;
+        document.getElementById("exportHistoryBtn").onclick = exportHistory;
+        document.getElementById("prefillBtn").onclick = prefillLastSession;
+
+        document.getElementById("prefillCsvBtn").onclick = () => {
+          document.getElementById("prefillCsvInput").click();
+        };
+
+        document.getElementById("prefillCsvInput").onchange = async e => {
+          const file = e.target.files[0];
+          if (!file) return;
+          await prefillFromWorkoutCSV(await file.text());
+          e.target.value = "";
+        };
+
+        document.getElementById("resetBtn").onclick = resetToday;
+        document.getElementById("resetTodayInsideBtn").onclick = resetToday;
+        document.getElementById("clearAllBtn").onclick = clearAll;
+
+        document.getElementById("undoDeleteBtn").onclick = async () => {
+          if (!lastDeletedHistory) return;
+          const item = { ...lastDeletedHistory.item };
+          delete item.id;
+          const newId = await requestToPromise(tx("history", "readwrite").add(item));
+          item.id = newId;
+          history.push(item);
+          history.sort((a, b) => String(a.exported_at || "").localeCompare(String(b.exported_at || "")));
+          lastDeletedHistory = null;
+          clearTimeout(undoTimer);
+          hideUndoToast();
+          renderHistory();
+          renderStats();
+        };
+      } catch (err) {
+        console.error(err);
+        alert("Storage failed to load. IndexedDB may be blocked in this browser/private mode.");
+      }
+    }
+
+    init();
   </script>
 </body>
 </html>
